@@ -47,8 +47,7 @@ def generateObservations(**params):
     power_recv = power_transmit / (np.sum((params['bs_positions']-params['ue_final_pos'])**2, axis=1)\
                                    + params['bs_height']**2)**(params['pathloss']/2)
     ## Random Gaussian noise with scale and mean from the power received. Better absolute scale and mean?
-    noise = generateNoise(mean=np.max(power_recv/10), n=params['tier1bsindex']+params['tier2bsindex'], samples=3)
-    # noise = np.sum(np.random.normal(loc=np.max(power_recv/10), scale=np.max(power_recv/10), size=(3,params['tier1bsindex']+params['tier2bsindex'])), axis=0)
+    noise = generateNoise(mean=np.max(power_recv/100), n=params['tier1bsindex']+params['tier2bsindex'], samples=3)
     ## Exponential Fading
     fading_obs = generateFading(fading_type=params['fading'][0], params=params['fading'][1:],
                                 n=params['tier1bsindex']+params['tier2bsindex'], samples=3)
@@ -131,7 +130,8 @@ class LteEnv(Env):
         self.ue_trace.append(params['ue_initial_pos'])
         self.power_theoretical_trace = []
         self.max_power = []
-        self.max_power1 = []
+        self.max_throughput = []
+        self.best_action = []
 
 
         ## Pre-Generated Scenarios
@@ -259,22 +259,37 @@ class LteEnv(Env):
         fading = np.copy(self.observations['fading'][-1])
         connection = np.copy(self.observations['connection'][-1])
         throughput = 0
-                
+        best_throughput = 0
+
+        self.best_action.append(np.argmax(power))
+        
         for s in range(int(samples)):
-            noise_random = np.random.normal(noise, 0)
-            fading_random = np.random.normal(fading, 0)
+            if self.config['noiseless']:
+                noise_random = np.random.normal(noise, 0)
+                fading_random = np.random.normal(fading, 0)
+            else:
+                noise_random = np.random.normal(noise, np.absolute(noise)/10)
+                fading_random = np.random.normal(fading, np.absolute(fading)/100)
+                
             faded_signal = fading_random*power
             #FORMULA = log(1+signal_strength/(noise+interfering_signals))
             sinr = (faded_signal[connection]) / (np.sum(faded_signal) + np.sum(noise_random) - faded_signal[connection])
             if 1+sinr > 0:
                 throughput += self.config['integration_sampling_rate']*np.log(1+sinr)/np.log(2)
+
+            
+            sinr_best = (faded_signal[self.best_action[-1]]) / (np.sum(faded_signal) + np.sum(noise_random) - faded_signal[self.best_action[-1]])
+            if 1+sinr_best > 0:
+                best_throughput += self.config['integration_sampling_rate']*np.log(1+sinr_best)/np.log(2)
+
+        self.max_throughput.append(best_throughput*self.config['bandwidth'])
             
 
             # TO be used when the theoretical power needs to be updated as per integration
             # sampling rate (heavy computation)
             # obs_copy['ue_final_pos'] = pos + diff
             # obs = generateObservations(**obs_copy)
-        #print(throughput)
+        #print(throughput*self.config['bandwidth'])
         return throughput*self.config['bandwidth']
                                    
 
@@ -295,11 +310,16 @@ class LteEnv(Env):
             return self.bs_dict
 
     def _getHandoverDetails(self):
-        print(self.handovers, self.config['handover_cost'])
+        print('Handovers: ' + str(self.handovers), 'Handover Cost: ' + str(self.config['handover_cost']))
         print()
         return self.handovers, self.config['handover_cost']
     
+    def _getBestThroughput(self):
+        return self.max_throughput
 
+    def _getBestActions(self):
+        return self.best_action
+    
     
     def step(self, action=None):
         self.steps_done += 1
@@ -325,6 +345,7 @@ class LteEnv(Env):
         self.observations['fading'].append(fading)
 
 
+
         # Maintain past history only for a fixed number of time steps to maintain low memory usage
         if len(self.observations['power']) > self.config['sinr_history']:
             self.observations['power'] = self.observations['power'][1:]
@@ -333,10 +354,9 @@ class LteEnv(Env):
             self.observations['connection'] = self.observations['connection'][1:]
         
         reward = self.getThroughput()
-        # print(reward)
 
         # If Handoff occurs then subtract the cost of handoff from the reward
-        if len(self.observations['connection']) > 2:
+        if len(self.observations['connection']) >= 2:
             self.handovers += int(bool(self.observations['connection'][-1] - self.observations['connection'][-2]))
             reward = reward - self.config['handover_cost']*int(bool(self.observations['connection'][-1] - self.observations['connection'][-2]))
         
@@ -374,6 +394,7 @@ config = {'scenario':'random', 'bs_positions':None, 'lambda_sparse':1,
           'handover_cost':0, 'bandwidth':10,
           'city_dimensions':'random', 'city_scale':0.25, 'city_scale_distribution':'normal',
           'bs_height':50, 'sparse_bs_power':20, 'city_bs_power':20, 'pathloss':4, 'fading':['exponential',1],
+          'noiseless':True,
           'ue_movement':'QRWP', 'vel_bound':150, 'ue_initial_pos':(500,500), 'ue_initial_vel':20,
           'ue_initial_angle':1, 'max_vel_change':2, 'max_angle_change':0.09, 'ue_trajectory':None, 
           'bs_seed':1374, 'ue_seed':137,'sampling_rate':0.1, 'steps':100000, 'generate_plot':True, 'generate_trace':True,
@@ -381,7 +402,7 @@ config = {'scenario':'random', 'bs_positions':None, 'lambda_sparse':1,
 
 env = LteEnv(**config)
 bs_seed= 589
-ue_seed = 50
+ue_seed = 6
 env.reset(bs_seed=bs_seed, ue_seed=ue_seed)
 bs = env._getBSDetails()
 
@@ -434,3 +455,4 @@ end = timer()
             
 print(end-start)
 print(s/len(bs_seed))"""
+
