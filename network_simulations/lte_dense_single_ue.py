@@ -5,6 +5,10 @@ import time
 from gym import Env
 from gym.spaces import Discrete, Box
 
+# For storage
+import pickle  # For everything else
+import json  # For config file storage or retrieval
+
 # For performance optimization
 from timeit import default_timer as timer
 from datetime import timedelta
@@ -293,7 +297,7 @@ class LteEnv(Env):
         return throughput*self.config['bandwidth']
                                    
 
-    # Functions to access information for debugging
+    ## Functions to access information for debugging
     def _getObservation(self):
         return np.copy(self.observations)
 
@@ -307,7 +311,7 @@ class LteEnv(Env):
         if self.config['scenario'] == 'custom':
             return self.config['bs_positions']
         elif self.config['scenario'] == 'random':
-            return self.bs_dict
+            return self.bs_dict,self.bs_positions
 
     def _getHandoverDetails(self):
         print('Handovers: ' + str(self.handovers), 'Handover Cost: ' + str(self.config['handover_cost']))
@@ -388,7 +392,7 @@ class LteEnv(Env):
         
     
 
-
+"""
 config = {'scenario':'random', 'bs_positions':None, 'lambda_sparse':1,
           'lambda_centres':0.2, 'lambda_dense':4, 'dimensions':[10,10], 'integration_sampling_rate':0.01,
           'handover_cost':0, 'bandwidth':10,
@@ -397,18 +401,17 @@ config = {'scenario':'random', 'bs_positions':None, 'lambda_sparse':1,
           'noiseless':True,
           'ue_movement':'QRWP', 'vel_bound':150, 'ue_initial_pos':(500,500), 'ue_initial_vel':20,
           'ue_initial_angle':1, 'max_vel_change':2, 'max_angle_change':0.09, 'ue_trajectory':None, 
-          'bs_seed':1374, 'ue_seed':137,'sampling_rate':0.1, 'steps':100000, 'generate_plot':True, 'generate_trace':True,
-          'sinr_history':100}
+          'bs_seed':589, 'ue_seed':6,'sampling_rate':0.1, 'steps':100000, 'generate_plot':True, 'generate_trace':True,
+          'sinr_history':100}"""
+
+with open('config_lte_dense_single_ue.json', 'r') as f:
+    config = json.load(f)
 
 env = LteEnv(**config)
-bs_seed= 589
-ue_seed = 6
-env.reset(bs_seed=bs_seed, ue_seed=ue_seed)
-bs = env._getBSDetails()
+
 
 """
-# Implement count for number of handover decisions
-# Config file
+
 # Plotting
 
 
