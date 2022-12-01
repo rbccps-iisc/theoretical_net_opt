@@ -130,12 +130,13 @@ class LteEnv(Env):
         self.handovers = 0
 
         # Lists to store traces/data for plotting and results
-        self.ue_trace = []
-        self.ue_trace.append(params['ue_initial_pos'])
-        self.power_theoretical_trace = []
-        self.max_power = []
-        self.max_throughput = []
-        self.best_action = []
+        self.ue_trace = np.array([])
+        self.ue_trace = np.append(self.ue_trace, params['ue_initial_pos'])
+        self.power_theoretical_trace = np.array([])
+        self.max_power = np.array([])
+        self.selected_power = np.array([])
+        self.max_throughput = np.array([])
+        self.best_action = np.array([], dtype=np.int64)
 
 
         ## Pre-Generated Scenarios
@@ -237,7 +238,8 @@ class LteEnv(Env):
             self.obs_config['ue_final_pos'] = np.array(self.obs_config['ue_trajectory'][self.ue_index], dtype=np.float64)
 
         # Store the trace/position for ploting
-        self.ue_trace.append(self.obs_config['ue_final_pos'])
+        if self.config['generate_trace']:
+            self.ue_trace = np.append(self.ue_trace, self.obs_config['ue_final_pos'])
                        
 
 
@@ -265,7 +267,9 @@ class LteEnv(Env):
         throughput = 0
         best_throughput = 0
 
-        self.best_action.append(np.argmax(power))
+        self.best_action = np.append(self.best_action, np.argmax(power))
+        self.max_power = np.append(self.max_power, np.max(power))
+        self.selected_power = np.append(self.selected_power, power[connection])
         
         for s in range(int(samples)):
             if self.config['noiseless']:
@@ -275,25 +279,25 @@ class LteEnv(Env):
                 noise_random = np.random.normal(noise, np.absolute(noise)/10)
                 fading_random = np.random.normal(fading, np.absolute(fading)/100)
                 
+                
             faded_signal = fading_random*power
             #FORMULA = log(1+signal_strength/(noise+interfering_signals))
             sinr = (faded_signal[connection]) / (np.sum(faded_signal) + np.sum(noise_random) - faded_signal[connection])
             if 1+sinr > 0:
                 throughput += self.config['integration_sampling_rate']*np.log(1+sinr)/np.log(2)
 
-            
             sinr_best = (faded_signal[self.best_action[-1]]) / (np.sum(faded_signal) + np.sum(noise_random) - faded_signal[self.best_action[-1]])
             if 1+sinr_best > 0:
                 best_throughput += self.config['integration_sampling_rate']*np.log(1+sinr_best)/np.log(2)
 
-        self.max_throughput.append(best_throughput*self.config['bandwidth'])
+        self.max_throughput = np.append(self.max_throughput, best_throughput*self.config['bandwidth'])
             
 
             # TO be used when the theoretical power needs to be updated as per integration
             # sampling rate (heavy computation)
             # obs_copy['ue_final_pos'] = pos + diff
             # obs = generateObservations(**obs_copy)
-        #print(throughput*self.config['bandwidth'])
+            
         return throughput*self.config['bandwidth']
                                    
 
@@ -301,17 +305,19 @@ class LteEnv(Env):
     def _getObservation(self):
         return np.copy(self.observations)
 
-    def _getUePosition(self):
+    def _getUEPosition(self):
         return self.obs_config['ue_final_pos']
 
-    def _getSeed(self):
-        return self.config['bs_seed'], self.config['ue_seed']
+    def _getUETrace(self):
+        if self.config['generate_trace']:
+            return np.reshape(self.ue_trace, (-1,2))
+        return None
 
     def _getBSDetails(self):
         if self.config['scenario'] == 'custom':
             return self.config['bs_positions']
         elif self.config['scenario'] == 'random':
-            return self.bs_dict,self.bs_positions
+            return self.bs_dict, np.copy(self.bs_positions)
 
     def _getHandoverDetails(self):
         print('Handovers: ' + str(self.handovers), 'Handover Cost: ' + str(self.config['handover_cost']))
@@ -319,10 +325,24 @@ class LteEnv(Env):
         return self.handovers, self.config['handover_cost']
     
     def _getBestThroughput(self):
-        return self.max_throughput
+        return np.copy(self.max_throughput)
 
-    def _getBestActions(self):
-        return self.best_action
+    def _getBestSinr(self):
+        return np.copy(self.max_sinr)
+
+    def _getBestAction(self):
+        return np.copy(self.best_action)
+
+    def _getMaxPower(self):
+        return np.copy(self.max_power)
+
+    def _getSelectedPower(self):
+        return np.copy(self.selected_power)
+
+    def _getSeed(self):
+        return self.config['bs_seed'], self.config['ue_seed']
+
+    
     
     
     def step(self, action=None):
@@ -349,7 +369,6 @@ class LteEnv(Env):
         self.observations['fading'].append(fading)
 
 
-
         # Maintain past history only for a fixed number of time steps to maintain low memory usage
         if len(self.observations['power']) > self.config['sinr_history']:
             self.observations['power'] = self.observations['power'][1:]
@@ -370,10 +389,20 @@ class LteEnv(Env):
         
     ## bs_seed: Changes Base Station layout
     ## ue_seed: Changes Random path followed by UE
-    def reset(self, bs_seed=5, ue_seed=6):
-        self.config['bs_seed'] = bs_seed
-        self.config['ue_seed'] = ue_seed
+    def reset(self, bs_seed=None, ue_seed=None):
+        if bs_seed:
+            self.config['bs_seed'] = bs_seed
+        else:
+            self.config['bs_seed'] = self.config['bs_seed']
+
+        if ue_seed:
+            self.config['ue_seed'] = ue_seed
+        else:
+            self.config['ue_seed'] = self.config['ue_seed']
         self.__init__(**self.config)
+
+        # Once the BS locations have been set, we can set the np.seed to ue_seed
+        # since it is the only cource of randomness left
         np.random.seed(self.config['ue_seed'])
 
         
@@ -383,8 +412,6 @@ class LteEnv(Env):
         self.observations['power'].append(power)
         self.observations['noise'].append(noise)
         self.observations['fading'].append(fading)
-
-        self.max_power.append(np.argmax(power))
         
         
         return np.copy(np.append(power*fading+noise, np.zeros(len(power))))
@@ -401,20 +428,64 @@ config = {'scenario':'random', 'bs_positions':None, 'lambda_sparse':1,
           'noiseless':True,
           'ue_movement':'QRWP', 'vel_bound':150, 'ue_initial_pos':(500,500), 'ue_initial_vel':20,
           'ue_initial_angle':1, 'max_vel_change':2, 'max_angle_change':0.09, 'ue_trajectory':None, 
-          'bs_seed':589, 'ue_seed':6,'sampling_rate':0.1, 'steps':100000, 'generate_plot':True, 'generate_trace':True,
+          'bs_seed':589, 'ue_seed':6,'sampling_rate':0.1, 'steps':100000, 'generate_trace':True,
           'sinr_history':100}"""
 
-with open('config_lte_dense_single_ue.json', 'r') as f:
+with open('config1_lte_dense_single_ue.json', 'r') as f:
     config = json.load(f)
 
 env = LteEnv(**config)
+
 
 
 """
 
 # Plotting
 
+## Test scenario of single UE paths and a single BS environment
+steps = 10000
+env.reset()
+ue_trace = np.array([])
+bs_det,bs_pos = env._getBSDetails()
 
+for _ in range(steps):
+    env.step()
+
+ue_trace = env._getUETrace()
+
+# Plot UE path
+plt.plot(ue_trace[:,0], ue_trace[:,1], label = 'UE Path', linewidth=0.35)  
+
+# Plot BASE STATIONS
+# Sparse Base Stations are in Green, * marker
+# City Base Stations are in Red, . marker
+
+city_bs = []
+for i in bs_det.keys():
+    if isinstance(i, int):
+        city_bs.append(bs_det[i])
+    else:
+        plt.scatter(bs_det[i][:,0], bs_det[i][:,1], color='green', marker='*', s=100, label = 'sparse')
+
+city_bs_np = city_bs[0]
+for i in range(len(city_bs)-1):
+    city_bs_np = np.vstack((city_bs_np, city_bs[i+1]))
+
+plt.scatter(city_bs_np[:,0], city_bs_np[:,1], color='red', marker='.', s=100, label='city')
+
+  
+        
+plt.legend(loc="upper left")
+
+plt.xlabel('metres')
+plt.ylabel('metres')
+
+plt.savefig('experiment1.pdf')
+
+plt.show()
+"""
+    
+"""
 ## Test scenario of multiple UE paths and a single BS environment
 ue_seed = [6] #,100,200,300]
 bs_seed = [589] #,45,56,7,9,98,34,55,66]
@@ -422,6 +493,7 @@ ue_pos = {}
 fig = plt.figure()
 ax = fig.add_subplot(111)
 
+steps = 10000
 start = timer()
 s=0
 for b in bs_seed: 
@@ -430,7 +502,7 @@ for b in bs_seed:
         ue_pos[seed] = []
         ue_pos[seed].append(env._getUePosition())
 
-        for _ in range(10000):
+        for _ in range(steps):
             env.step()
             ue_pos[seed].append(env._getUePosition())
 
