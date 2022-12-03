@@ -293,7 +293,7 @@ def trainIters(actor, critic, n_iters, horizon, bs_seed, ue_seed):
 trials = 20
 trial_records = {}
 
-for t in range(6,trials):
+for t in range(trials):
     print('Trial: ' + str(t))
     trial_records[t] = {'npseed':t*7, 'torchseed':t*17, 'randomseed':t*23, 'records':None}
     torch.manual_seed(t*17)
@@ -305,7 +305,7 @@ for t in range(6,trials):
     trial_records[t]['records'] = records
 
     
-with open('exp3.pickle', 'wb') as f:
+with open('experiment.pickle', 'wb') as f:
     pickle.dump(trial_records, f)
 
 
