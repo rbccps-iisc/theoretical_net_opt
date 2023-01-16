@@ -1,0 +1,8 @@
+In this experiment we apply the A2C RL algorithm to learn a policy in a completely noisless setting.
+For this experiment we collect test rewards. We have a collection of 5 test seeds and 40 training seeds
+which decide the pasth taken by UE starting from (500,500). The BS seed or BS configuration stays the same. 
+We train on randomly picked 5 seeds of the training dataset over a 2500 length horizon and then check the 
+rewards obtained for the 5 test seeds, and we do this for 500 iterations. 
+We repeat the process for different Neural Network initializations.
+
+* We only pick a some best performing seeds to plot the results.

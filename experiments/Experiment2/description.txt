@@ -1,0 +1,5 @@
+In this experiment we apply the A2C RL algorithm to learn a policy in a completely noisless setting.
+We collect the training rewards for a horizon length of 5000 steps, repeating this over 500 iterations 
+of training and finally repeating this experiment over multiple initializations of the underlying Neural Network.
+
+* We exclude seeds which gets stuck at a certain reward after some time steps of the horizon.
