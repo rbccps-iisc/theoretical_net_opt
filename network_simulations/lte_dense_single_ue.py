@@ -138,15 +138,18 @@ class LteEnv(Env):
         self.max_throughput = np.array([])
         self.best_action = np.array([], dtype=np.int64)
 
+        # Dictionary to store base station details for plotting
+        self.bs_dict = {}
 
         ## Pre-Generated Scenarios
         if params['scenario'] == 'custom':
             obs_length = len(params['bs_positions'])
+            self.bs_dict['sparse_bs'] = params['bs_positions']
+            self.sparse_bs_points = np.copy(params['bs_positions'])
+            self.city_bs_points = np.array([])
             
         ## Generate the positions as numpy arrays
-        if params['scenario'] == 'random':
-            # Dictionary to store base station details for plotting
-            self.bs_dict = {}
+        elif params['scenario'] == 'random':
             
             totalArea = params['dimensions'][0]*params['dimensions'][1]
             num_ppp1_sparse = ss.poisson(totalArea*params['lambda_sparse']).rvs()
@@ -196,8 +199,13 @@ class LteEnv(Env):
         # Create an initial observation and return it to 'reset()'. Will maintain
         # 100 past observations
         self.observations = {'power':[], 'connection':[], 'noise':[], 'fading':[]}
+
+        if len(self.city_bs_points) > 0:
+            self.bs_positions = np.vstack((self.sparse_bs_points, self.city_bs_points))
+        else:
+            self.bs_positions = np.array(self.sparse_bs_points)
+
         
-        self.bs_positions = np.vstack((self.sparse_bs_points, self.city_bs_points))
         self.obs_config = {'pathloss':params['pathloss'], 'fading':params['fading'], 'bs_positions':self.bs_positions,
                            'bs_height':params['bs_height'],'tier1bsindex':len(self.sparse_bs_points), 'tier2bsindex':len(self.city_bs_points),
                            'tier1bspower':params['sparse_bs_power'],'tier2bspower':params['city_bs_power'],
@@ -368,6 +376,13 @@ class LteEnv(Env):
         self.observations['noise'].append(noise)
         self.observations['fading'].append(fading)
 
+        # Test
+##        self.max_power.append(np.argmax(power)) 
+##        #print(len(action))
+##        indices = (-power).argsort()[:10]
+##        self.max_power1.append(indices[0])
+##        print('Inside LTE Env')
+##        print(power[indices])
 
         # Maintain past history only for a fixed number of time steps to maintain low memory usage
         if len(self.observations['power']) > self.config['sinr_history']:
@@ -431,20 +446,43 @@ config = {'scenario':'random', 'bs_positions':None, 'lambda_sparse':1,
           'bs_seed':589, 'ue_seed':6,'sampling_rate':0.1, 'steps':100000, 'generate_trace':True,
           'sinr_history':100}"""
 
-with open('config1_lte_dense_single_ue.json', 'r') as f:
-    config = json.load(f)
+"""Load a config file"""
+##
+## with open('config1_lte_dense_single_ue.json', 'r') as f:
+##     config = json.load(f)
+## env = LteEnv(**config)
+
+
+
+
+"""Creating a custom BS layout"""
+
+bs_positions = np.array(list(zip(np.linspace(1,4,num=31), [0]*31)))   # in kilometeres
+dimensions = [5,5] # in kilometeres
+
+config = {'scenario':'custom', 'bs_positions':bs_positions, 'lambda_sparse':None,
+          'lambda_centres':None, 'lambda_dense':None, 'dimensions':dimensions, 'integration_sampling_rate':0.01,
+          'handover_cost':0, 'bandwidth':10,
+          'city_dimensions':None, 'city_scale':None, 'city_scale_distribution':None,
+          'bs_height':50, 'sparse_bs_power':20, 'city_bs_power':20, 'pathloss':4, 'fading':['exponential',1],
+          'noiseless':True,
+          'ue_movement':'QRWP', 'vel_bound':150, 'ue_initial_pos':(500,500), 'ue_initial_vel':20,
+          'ue_initial_angle':1, 'max_vel_change':2, 'max_angle_change':0.09, 'ue_trajectory':None, 
+          'bs_seed':589, 'ue_seed':6,'sampling_rate':0.1, 'steps':100000, 'generate_trace':True,
+          'sinr_history':100}
 
 env = LteEnv(**config)
 
 
 
-"""
+
 
 # Plotting
 
+"""
 ## Test scenario of single UE paths and a single BS environment
 steps = 10000
-env.reset()
+env.reset(bs_seed=59, ue_seed=7)
 ue_trace = np.array([])
 bs_det,bs_pos = env._getBSDetails()
 
@@ -480,7 +518,7 @@ plt.legend(loc="upper left")
 plt.xlabel('metres')
 plt.ylabel('metres')
 
-plt.savefig('experiment1.pdf')
+#plt.savefig('experiment.png')
 
 plt.show()
 """
