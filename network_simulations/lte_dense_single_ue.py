@@ -80,14 +80,31 @@ def generateNoise(mean, n, samples):
 
 """Custom functions for random vehicle movement"""
 
-## Random 2D Walk Model
+## Straight line constant velocity mobility
+def constStraightLine(vel, angle, pos, step, dimensions):
+    pos = pos + step*np.array([vel*np.cos(angle), vel*np.sin(angle)])
+    pos[0] = np.clip(pos[:1], 0, dimensions[0]*1000)
+    pos[1] = np.clip(pos[1:], 0, dimensions[1]*1000)
+    return pos,vel,angle
+    
+
+## Straight line quasi random velocity mobility
+def quasiRandomStraightLine(vel_change, vel, angle, pos, step, dimensions):
+    vel = vel + np.random.uniform(low=-vel_change, high=vel_change)
+    pos = pos + step*np.array([vel*np.cos(angle), vel*np.sin(angle)])
+    pos[0] = np.clip(pos[:1], 0, dimensions[0]*1000)
+    pos[1] = np.clip(pos[1:], 0, dimensions[1]*1000)
+    return pos,vel,angle
+
+
+## Random 2D Walk mobility
 def radomWayPointMovement(vel_high, vel_low, pos, step, dimensions):
     vel = (vel_high-vel_low)*np.random.uniform(low=0, high=1)
     angle = 2*np.pi*np.random.uniform(low=0, high=1)
     pos = pos + step*np.array([vel*np.cos(angle), vel*np.sin(angle)])
     pos[0] = np.clip(pos[:1], 0, dimensions[0]*1000)
     pos[1] = np.clip(pos[1:], 0, dimensions[1]*1000)
-    return pos
+    return pos,vel,angle
 
 
 ## Quasi Random 2D walk model
@@ -144,8 +161,8 @@ class LteEnv(Env):
         ## Pre-Generated Scenarios
         if params['scenario'] == 'custom':
             obs_length = len(params['bs_positions'])
-            self.bs_dict['sparse_bs'] = params['bs_positions']
-            self.sparse_bs_points = np.copy(params['bs_positions'])
+            self.bs_dict['sparse_bs'] = 1000*np.array(list(params['bs_positions']))
+            self.sparse_bs_points = 1000*np.array(list(np.copy(params['bs_positions'])))
             self.city_bs_points = np.array([])
             
         ## Generate the positions as numpy arrays
@@ -233,6 +250,16 @@ class LteEnv(Env):
                                                                           angle_change=self.config['max_angle_change'] , angle=self.obs_config['ue_angle'],
                                                                           pos=self.obs_config['ue_final_pos'], step=self.config['sampling_rate'],
                                                                           dimensions=self.config['dimensions'])
+        elif self.config['ue_movement'] == 'QRSL':
+            self.obs_config['ue_final_pos'],vel,angle = quasiRandomStraightLine(vel_change=self.config['max_vel_change'], vel=self.obs_config['ue_velocity'],
+                                                                          angle=self.obs_config['ue_angle'],pos=self.obs_config['ue_final_pos'],
+                                                                          step=self.config['sampling_rate'], dimensions=self.config['dimensions'])
+            
+        elif self.config['ue_movement'] == 'CSL':
+            self.obs_config['ue_final_pos'],vel,angle = constRandomStraightLine(vel=self.obs_config['ue_velocity'], angle=self.obs_config['ue_angle'],
+                                                                          pos=self.obs_config['ue_final_pos'], step=self.config['sampling_rate'],
+                                                                          dimensions=self.config['dimensions'])
+            
             self.obs_config['ue_velocity'] = vel
             self.obs_config['ue_angle'] = angle
             ## Hitting a wall condition, then reverse direction
@@ -323,7 +350,7 @@ class LteEnv(Env):
 
     def _getBSDetails(self):
         if self.config['scenario'] == 'custom':
-            return self.config['bs_positions']
+            return self.bs_dict, np.copy(self.bs_positions)
         elif self.config['scenario'] == 'random':
             return self.bs_dict, np.copy(self.bs_positions)
 
@@ -466,7 +493,7 @@ config = {'scenario':'custom', 'bs_positions':bs_positions, 'lambda_sparse':None
           'city_dimensions':None, 'city_scale':None, 'city_scale_distribution':None,
           'bs_height':50, 'sparse_bs_power':20, 'city_bs_power':20, 'pathloss':4, 'fading':['exponential',1],
           'noiseless':True,
-          'ue_movement':'QRWP', 'vel_bound':150, 'ue_initial_pos':(500,500), 'ue_initial_vel':20,
+          'ue_movement':'QRSL', 'vel_bound':150, 'ue_initial_pos':(500,500), 'ue_initial_vel':20,
           'ue_initial_angle':1, 'max_vel_change':2, 'max_angle_change':0.09, 'ue_trajectory':None, 
           'bs_seed':589, 'ue_seed':6,'sampling_rate':0.1, 'steps':100000, 'generate_trace':True,
           'sinr_history':100}
@@ -476,6 +503,17 @@ env = LteEnv(**config)
 
 
 
+bs_det,bs_pos = env._getBSDetails()
+
+plt.scatter(bs_pos[:,0], bs_pos[:,1], color='red', marker='.', s=100, label='custom')
+       
+plt.legend(loc="upper left")
+
+plt.xlabel('metres')
+plt.ylabel('metres')
+
+plt.savefig('experiment_.png')
+plt.show()
 
 # Plotting
 
