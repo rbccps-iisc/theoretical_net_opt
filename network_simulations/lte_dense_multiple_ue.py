@@ -45,29 +45,29 @@ def generatePPP(num_points=10, dimensions=None, layout='rect'):
 """Custom functions for random vehicle movement"""
 
 # Random 2D Walk Model
-def radomWayPointMovement(maxSpeed, pos, stepSize, dimensions, movement):
-    speed = 2*maxSpeed*np.random.uniform(low=0, high=1)
+def radomWayPointMovement(**params):
+    speed = 2*params['maxSpeed']*np.random.uniform(low=0, high=1)
     angle = 2*np.pi*np.random.uniform(low=0, high=1)
-    pos = pos + stepSize*np.array([speed*np.cos(angle), speed*np.sin(angle)])
-    pos[0] = np.clip(pos[:1], 0, dimensions[0]*1000)
-    pos[1] = np.clip(pos[1:], 0, dimensions[1]*1000)
+    pos = params['pos'] + params['stepSize']*np.array([speed*np.cos(angle), speed*np.sin(angle)])
+    pos[0] = np.clip(pos[:1], 0, params['dimensions'][0]*1000)
+    pos[1] = np.clip(pos[1:], 0, params['dimensions'][1]*1000)
     return {'pos':pos,'speed':speed,'angle':angle}
 
 
 # Quasi Random 2D walk model
-# UNNECESSARY KEYWORDS
-def quasiRandomWayPointMovement(maxSpeed, maxSpeedChange, speed, maxAngleChange, angle, pos,
-                                stepSize, dimensions, movement, trajectory, bsConnection, rbs):
-    speed = speed + np.random.uniform(low=-maxSpeedChange, high=maxSpeedChange)
-    angle = angle + np.random.uniform(low=-maxAngleChange, high=maxAngleChange)
-    pos = pos + stepSize*np.array([speed*np.cos(angle), speed*np.sin(angle)])
-    pos[0] = np.clip(pos[:1], 0, dimensions[0])
-    pos[1] = np.clip(pos[1:], 0, dimensions[1])
+def quasiRandomWayPointMovement(**params): 
+    speed = params['speed'] + np.random.uniform(low=-maxSpeedChange, high=maxSpeedChange)
+    angle = params['angle'] + np.random.uniform(low=-maxAngleChange, high=maxAngleChange)
+    pos = params['pos'] + params['stepSize']*np.array([speed*np.cos(angle), speed*np.sin(angle)])
+    pos[0] = np.clip(pos[:1], 0, params['dimensions'][0])
+    pos[1] = np.clip(pos[1:], 0, params['dimensions'][1])
     return {'pos':pos,'speed':speed,'angle':angle}
 
 # Custom 2D movement
-def customMovement(trajectory, steps):
-    pass
+def customMovement(**params):
+    step = params['step']
+    print(params['trajectory'][step])
+    return {'pos':params['trajectory'][step],'speed':None,'angle':None}
 
 ##### END OF FUNCTIONS FOR GENERATING UE MOBILITY MODELS #####
 
@@ -198,6 +198,9 @@ class UserEquipment(object):
     def __init__(self, **params):
         self.ue_config = params
 
+        # Keep track of the number of steps taken by a UE internally
+        self.ue_config['step'] = 0
+
     ## Updates the UEs connection to a BS.
     def updateConnections(self, bsConnection, rbs):
         self.ue_config['bsConnection'] = bsConnection
@@ -212,6 +215,9 @@ class UserEquipment(object):
         self.ue_config['pos'] = ueMovementStatus['pos']
         self.ue_config['speed'] = ueMovementStatus['speed']
         self.ue_config['angle'] = ueMovementStatus['angle']
+
+        ## Update the number of steps taken
+        self.ue_config['step'] += 1
         
 
     ### GETTER FUNCTIONS ###
@@ -591,7 +597,7 @@ initialAngle = np.random.uniform(low=0, high=2*np.pi, size=num_ue)
 
 ue_params = {'maxSpeed':maxSpeed, 'maxSpeedChange':maxSpeedChange, 'maxAngleChange':maxAngleChange,
              'stepSize':stepSize, 'dimensions':totalDimensions,
-             'movement':quasiRandomWayPointMovement, 'trajectory':None}
+             'movement':customMovement, 'trajectory':[[1,2],[3,4]]}
 
 ### Create a list of UserEquipment objects
 ueList = [UserEquipment(**{**ue_params,'pos':ue_positions[i], 'speed':initialSpeed[i], 'angle':initialAngle[i]}) for i in range(num_ue)]
