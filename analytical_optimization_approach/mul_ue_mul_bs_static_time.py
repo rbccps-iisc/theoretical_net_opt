@@ -12,7 +12,7 @@ import pickle
 ## OBJECTIVE: Maximize the total bitrate of the system summed across all UEs
 ## where BitRate is log(1+SINR).
 ## CONSTRAINTS: Each UE can connect only to a single BS (no restriction on the number 
-## of RBs allocated). Each RB can be allocated to a dingle UE.
+## of RBs allocated). Each RB can be allocated to a single UE.
 ## NOTE: For our simulation we have randomly sampled the bitrate from  probability distribution.
 
 
