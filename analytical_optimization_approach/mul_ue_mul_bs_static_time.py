@@ -7,13 +7,13 @@ import pickle
 
 ### SCENARIO:
 ## We have multiple Base Stations (BSs) and each with multiple Resource Blocks (RBs).
-## We also have multiple User Equipments (UEs) which observe certain theoretically
+## We also have multiple User Equipment (UEs) which observe certain theoretically
 ## maximum SINR when connected to a particular BS.
 ## OBJECTIVE: Maximize the total bitrate of the system summed across all UEs
 ## where BitRate is log(1+SINR).
 ## CONSTRAINTS: Each UE can connect only to a single BS (no restriction on the number 
-## of RBs allocated). Each RB can be allocated to a dingle UE.
-## NOTE: For our simulation we have randomly sampled the bitrate from  probability distribution.
+## of RBs allocated). Each RB can be allocated to a single UE.
+## NOTE: We randomly sampled the SNR from a probability distribution for our simulation.
 
 
 """Build model function"""
@@ -32,15 +32,15 @@ def buildModel(bs=2, ue=2, max_rbs=5, min_rbs=2, seed=0):
     for i in range(bs):
         bs_rbs[i] = np.random.randint(low=min_rbs,high=max_rbs)
 
-    # Random BitRates being sampled
-    br = np.random.random((bs,ue))
+    # Random SINR being sampled
+    snr = np.random.random((bs,ue))
 
     # Decision variables for Link and Allocation Matrices
-    # The Link Matrix decided to which particular BS a UE is connected to (if connected)
+    # The Link Matrix decided to which particular BS a UE is connected (if connected)
     # The Allocation Matrix decides the resources allocated to a particular UE from a
     # particular BS (NOTE: It is entirely possible to allocate RBs to a UE but not be linked
-    # in which case effectively a UE receives no bitrate from a BS).
-    """Dimensions make the positional significance of a variable self explanatory"""
+    # in which case, effectively, a UE receives no bitrate from a BS).
+    """Dimensions make the positional significance of a variable self-explanatory"""
     lv = m.Array(m.Var,(bs, ue),lb=0,ub=1, integer=True) # Link Matrix
     
     av = {} # Allocation Matrix dictionary for each BS
@@ -66,11 +66,11 @@ def buildModel(bs=2, ue=2, max_rbs=5, min_rbs=2, seed=0):
 
     # OBJECTIVE:
     # The entries of the matrix denote the utility/objective attained
-    # by a barticular (bs,ue) pair for a given allocation
+    # by a particular (bs,ue) pair for a given allocation
     obj_u = m.Array(m.Var,(bs, ue))
     for i in range(ue):
         for j in range(0,bs):
-            obj_u[j,i] = lv[j][i]*sum(av[j][:,i])*br[j][i]
+            obj_u[j,i] = lv[j][i]*sum(av[j][:,i])*snr[j][i]
 
     for i in range(ue):
         m.Maximize(m.log(1+sum(obj_u[:,i])))
@@ -90,7 +90,7 @@ def buildModel(bs=2, ue=2, max_rbs=5, min_rbs=2, seed=0):
     print('Allocation Matrices')
     print(av)
     print('SINR Matrix')
-    print(br)
+    print(snr)
 
 
 
