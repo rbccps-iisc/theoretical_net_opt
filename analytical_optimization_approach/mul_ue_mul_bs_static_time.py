@@ -13,7 +13,7 @@ import pickle
 ## where BitRate is log(1+SINR).
 ## CONSTRAINTS: Each UE can connect only to a single BS (no restriction on the number 
 ## of RBs allocated). Each RB can be allocated to a single UE.
-## NOTE: We randomly sampled the SNR from a probability distribution for our simulation.
+## NOTE: We randomly sampled the SIR from a probability distribution for our simulation.
 
 
 """Build model function"""
@@ -29,11 +29,11 @@ def buildModel(bs=2, ue=2, max_rbs=5, min_rbs=2, seed=0):
 
     # For each BS randomly sample the number of RBs (maybe set deterministically)
     bs_rbs = {}
-    for i in range(bs):
-        bs_rbs[i] = np.random.randint(low=min_rbs,high=max_rbs)
+    for b in range(bs):
+        bs_rbs[b] = np.random.randint(low=min_rbs,high=max_rbs)
 
     # Random SINR being sampled
-    snr = np.random.random((bs,ue))
+    sir = np.random.random((bs,ue))
 
     # Decision variables for Link and Allocation Matrices
     # The Link Matrix decided to which particular BS a UE is connected (if connected)
@@ -44,22 +44,22 @@ def buildModel(bs=2, ue=2, max_rbs=5, min_rbs=2, seed=0):
     lv = m.Array(m.Var,(bs, ue),lb=0,ub=1, integer=True) # Link Matrix
     
     av = {} # Allocation Matrix dictionary for each BS
-    for i in range(bs):
-        av[i] = m.Array(m.Var,(bs_rbs[i], ue),lb=0,ub=1, integer=True)
+    for b in range(bs):
+        av[b] = m.Array(m.Var,(bs_rbs[b], ue),lb=0,ub=1, integer=True)
 
 
     # CONSTRAINTS:
     # Ensure each UE connected to a single BS:
-    for i in range(ue):
-        lv_sum = m.Var(value=0, name='Link Sum ' + str(i))
-        m.Equation(lv_sum == sum(lv[0:bs, i]))
+    for u in range(ue):
+        lv_sum = m.Var(value=0, name='Link Sum ' + str(u))
+        m.Equation(lv_sum == sum(lv[0:bs, u]))
         m.Equation(lv_sum <= 1)
 
     # Ensure each RB is connected to a single UE:
-    for i in range(bs):
-        for j in range(bs_rbs[i]):
-            av_sum = m.Var(value=0, name='Alloc Sum ' + str((i,j)))
-            m.Equation(av_sum == sum(av[i][j, 0:ue]))
+    for b in range(bs):
+        for r in range(bs_rbs[b]):
+            av_sum = m.Var(value=0, name='Alloc Sum ' + str((b,r)))
+            m.Equation(av_sum == sum(av[b][r, 0:ue]))
             m.Equation(av_sum <= 1)
 
 
@@ -68,12 +68,12 @@ def buildModel(bs=2, ue=2, max_rbs=5, min_rbs=2, seed=0):
     # The entries of the matrix denote the utility/objective attained
     # by a particular (bs,ue) pair for a given allocation
     obj_u = m.Array(m.Var,(bs, ue))
-    for i in range(ue):
-        for j in range(0,bs):
-            obj_u[j,i] = lv[j][i]*sum(av[j][:,i])*snr[j][i]
+    for u in range(ue):
+        for b in range(0,bs):
+            obj_u[b,u] = lv[b][u]*sum(av[b][:,u])*sir[b][u]
 
-    for i in range(ue):
-        m.Maximize(m.log(1+sum(obj_u[:,i])))
+    for u in range(ue):
+        m.Maximize(m.log(1+sum(obj_u[:,u])))
 
 
     #Set global options
@@ -89,8 +89,8 @@ def buildModel(bs=2, ue=2, max_rbs=5, min_rbs=2, seed=0):
     print(lv)
     print('Allocation Matrices')
     print(av)
-    print('SINR Matrix')
-    print(snr)
+    print('SIR Matrix')
+    print(sir)
 
 
 
