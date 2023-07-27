@@ -1,2 +1,6 @@
 # theoretical_net_opt
-Theoretical simulation of Networks and Optimization Algorithm testing
+
+## Theoretical simulation of Wireless Networks and testing Optimization Algorithms
+
+
+ 
