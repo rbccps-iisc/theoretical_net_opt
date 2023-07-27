@@ -10,8 +10,7 @@
 ## To Do:
 
 1.) (Incomplete) Add environment and perform Value/Policy Iteration methods for Finite and Infinite Horizon (deterministic vs data-driven)
-    Markup: 
-    1. Transition probabilities are given, and there is no randomness in signal strength.
+    Markup : 1. Transition probabilities are given, and there is no randomness in signal strength.
     
     2. Transition probabilities learned, and there is no randomness in signal strength.
     
